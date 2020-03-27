@@ -29,6 +29,8 @@ type Data struct {
 		Labels      map[string]string `json:"labels"`
 		ClusterID   string            `json:"clusterId"`
 		NodeName    string            `json:"nodeName"`
+		// AccountID for hosts
+		AccountID string `json:"accountId"`
 		// HostInfo for hosts
 		HostInfo *HostInfo `json:"info"`
 		// LaunchConfig for services
@@ -91,6 +93,11 @@ func (e *Exporter) processMetrics(data *Data, endpoint string, hideSys bool, ch 
 
 		log.Debugf("Processing metrics for %s", endpoint)
 
+		environmentName := ""
+		if endpoint != "accounts" {
+			environmentName = retrieveEnvRef(x.AccountID)
+		}
+
 		if endpoint == "hosts" {
 			filteredLabels = e.allowedLabels(x.Labels)
 			var s = x.HostName
@@ -99,8 +106,21 @@ func (e *Exporter) processMetrics(data *Data, endpoint string, hideSys bool, ch 
 			}
 			e.setHostStateMetrics(s, x.State, x.AgentState, filteredLabels)
 			if x.HostInfo != nil {
-				e.setHostInfoMetrics(s, x.HostInfo, filteredLabels)
+				e.setHostInfoMetrics(s, x.HostInfo, filteredLabels, x.AccountID, environmentName)
 			}
+		} else if endpoint == "accounts" {
+
+			// only collect project(environment)
+			if x.Type == "project" {
+				envRef = storeEnvRef(x.ID, x.Name)
+
+				if err := e.setEnvMetrics(x.ID, x.Name, x.State); err != nil {
+					log.Errorf("Error processing env metrics: %s", err)
+					log.Errorf("Attempt Failed to set %s, %s, %s", x.ID, x.Name, x.State)
+					continue
+				}
+			}
+
 		} else if endpoint == "stacks" {
 			// Used to create a map of stackID and stackName
 			// Later used as a dimension in service metrics
@@ -133,8 +153,8 @@ func (e *Exporter) processMetrics(data *Data, endpoint string, hideSys bool, ch 
 
 			e.setNodeMetrics(x.NodeName, x.State, clusterName)
 		}
-	}
 
+	}
 	return nil
 }
 
@@ -252,6 +272,28 @@ func retrieveClusterRef(clusterID string) string {
 			return "unknown"
 		} else if clusterID == key {
 			log.Debugf("ClusterRef - Key is %s, Value is %s ClusterID is %s", key, value, clusterID)
+			return value
+		}
+	}
+	// returns unknown if no match was found
+	return "unknown"
+}
+
+func storeEnvRef(ID string, name string) map[string]string {
+
+	envRef[ID] = name
+
+	return envRef
+}
+
+// retrieveStackRef returns the stack name, when sending the stackID
+func retrieveEnvRef(envID string) string {
+
+	for key, value := range envRef {
+		if envID == "" {
+			return "unknown"
+		} else if envID == key {
+			log.Debugf("envRef - Key is %s, Value is %s envID is %s", key, value, envID)
 			return value
 		}
 	}

@@ -78,31 +78,31 @@ func addMetrics() map[string]*prometheus.GaugeVec {
 			Namespace: namespace,
 			Name:      "host_cpu_count",
 			Help:      "Number of CPU Cores on host",
-		}, []string{"name", "labels"})
+		}, []string{"name", "labels", "environment_id", "environment_name"})
 	gaugeVecs["hostMemTotal"] = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "host_mem_total",
 			Help:      "Total memory size in MB",
-		}, []string{"name", "labels"})
+		}, []string{"name", "labels", "environment_id", "environment_name"})
 	gaugeVecs["hostMemFree"] = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "host_mem_free",
 			Help:      "Free memory size in MB",
-		}, []string{"name", "labels"})
+		}, []string{"name", "labels", "environment_id", "environment_name"})
 	gaugeVecs["hostMountPointTotal"] = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "host_mountpoint_total",
 			Help:      "Total size by mountpoint in MB",
-		}, []string{"name", "labels", "mountpoint"})
+		}, []string{"name", "labels", "mountpoint", "environment_id", "environment_name"})
 	gaugeVecs["hostMountPointUsed"] = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "host_mountpoint_used",
 			Help:      "Used size by mountpoint in MB",
-		}, []string{"name", "labels", "mountpoint"})
+		}, []string{"name", "labels", "mountpoint", "environment_id", "environment_name"})
 
 	// Cluster Metrics
 	gaugeVecs["clusterState"] = prometheus.NewGaugeVec(
@@ -125,6 +125,14 @@ func addMetrics() map[string]*prometheus.GaugeVec {
 			Name:      "node_state",
 			Help:      "State of defined node as reported by the Rancher API",
 		}, []string{"cluster_name", "state", "node_name"})
+
+	gaugeVecs["environmentState"] = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "rancher",
+			Name:      "environment_state",
+			Help:      "State of defined environment as reported by the Rancher API",
+		}, []string{"name", "state", "id"})
+
 	return gaugeVecs
 }
 
@@ -209,35 +217,45 @@ func (e *Exporter) setStackMetrics(name string, state string, health string, sys
 	}
 }
 
-func (e *Exporter) setHostInfoMetrics(name string, hi *HostInfo, labels map[string]string) {
+func (e *Exporter) setHostInfoMetrics(name string, hi *HostInfo, labels map[string]string, EnvironmentID string, EnvironmentName string) {
 	labelsStr := joinLabels(labels)
 
 	e.gaugeVecs["hostCPUCount"].With(prometheus.Labels{
-		"name":   name,
-		"labels": labelsStr,
+		"name":             name,
+		"labels":           labelsStr,
+		"environment_id":   EnvironmentID,
+		"environment_name": EnvironmentName,
 	}).Set(float64(hi.CPUInfo.Count))
 
 	e.gaugeVecs["hostMemTotal"].With(prometheus.Labels{
-		"name":   name,
-		"labels": labelsStr,
+		"name":             name,
+		"labels":           labelsStr,
+		"environment_id":   EnvironmentID,
+		"environment_name": EnvironmentName,
 	}).Set(float64(hi.MemoryInfo.MemTotal))
 
 	e.gaugeVecs["hostMemFree"].With(prometheus.Labels{
-		"name":   name,
-		"labels": labelsStr,
+		"name":             name,
+		"labels":           labelsStr,
+		"environment_id":   EnvironmentID,
+		"environment_name": EnvironmentName,
 	}).Set(float64(hi.MemoryInfo.MemFree))
 
 	for mountName, mountPoint := range hi.DiskInfo.MountPoints {
 		e.gaugeVecs["hostMountPointTotal"].With(prometheus.Labels{
-			"name":       name,
-			"labels":     labelsStr,
-			"mountpoint": mountName,
+			"name":             name,
+			"labels":           labelsStr,
+			"mountpoint":       mountName,
+			"environment_id":   EnvironmentID,
+			"environment_name": EnvironmentName,
 		}).Set(float64(mountPoint.Total))
 
 		e.gaugeVecs["hostMountPointUsed"].With(prometheus.Labels{
-			"name":       name,
-			"labels":     labelsStr,
-			"mountpoint": mountName,
+			"name":             name,
+			"labels":           labelsStr,
+			"mountpoint":       mountName,
+			"environment_id":   EnvironmentID,
+			"environment_name": EnvironmentName,
 		}).Set(float64(mountPoint.Used))
 	}
 }
@@ -315,4 +333,18 @@ func (e *Exporter) setNodeMetrics(nodeName string, state string, clusterName str
 			gauge.Set(0)
 		}
 	}
+}
+
+//setEnvMetrics x.ID,x.Name, x.State)
+//"name", "state","id"
+func (e *Exporter) setEnvMetrics(ID string, name string, state string) error {
+	for _, y := range envStates {
+		if state == y {
+			e.gaugeVecs["environmentState"].With(prometheus.Labels{"name": name, "state": y, "id": ID}).Set(1)
+		} else {
+			e.gaugeVecs["environmentState"].With(prometheus.Labels{"name": name, "state": y, "id": ID}).Set(0)
+		}
+
+	}
+	return nil
 }

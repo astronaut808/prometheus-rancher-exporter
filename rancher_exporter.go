@@ -43,10 +43,12 @@ var (
 	healthStates    = []string{"healthy", "unhealthy", "initializing", "degraded", "started-once"}
 	componentStatus = []string{"True", "False", "Unknown"}
 	nodeStates      = []string{"active", "cordoned", "drained", "draining", "provisioning", "registering", "unavailable"}
-	endpoints       = []string{"stacks", "services", "hosts"} // EndPoints the exporter will trawl
-	endpointsV3     = []string{"clusters", "nodes"}           // EndPoints the exporter will trawl]
-	stackRef        = make(map[string]string)                 // Stores the StackID and StackName as a map, used to provide label dimensions to service metrics
-	clusterRef      = make(map[string]string)                 // Stores the ClusterID and ClusterName as a map, used to provide label dimensions to node metrics
+	endpoints       = []string{"accounts", "stacks", "services", "hosts"} // EndPoints the exporter will trawl
+	endpointsV3     = []string{"clusters", "nodes"}                       // EndPoints the exporter will trawl]
+	envStates       = []string{"active", "inactive"}
+	envRef          = make(map[string]string)
+	stackRef        = make(map[string]string) // Stores the StackID and StackName as a map, used to provide label dimensions to service metrics
+	clusterRef      = make(map[string]string) // Stores the ClusterID and ClusterName as a map, used to provide label dimensions to node metrics
 )
 
 // getEnv - Allows us to supply a fallback option if nothing specified
