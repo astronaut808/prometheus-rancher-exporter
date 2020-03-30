@@ -27,13 +27,35 @@ type Data struct {
 		Type        string            `json:"type"`
 		AgentState  string            `json:"agentState"`
 		Labels      map[string]string `json:"labels"`
-		ClusterId   string            `json:"clusterId"`
+		ClusterID   string            `json:"clusterId"`
 		NodeName    string            `json:"nodeName"`
+		// AccountID for hosts
+		AccountID string `json:"accountId"`
+		// HostInfo for hosts
+		HostInfo *HostInfo `json:"info"`
 		// LaunchConfig for services
 		LaunchConfig *LaunchConfig `json:"launchConfig"`
 		// ComponentStatuses for clusters
 		ComponentStatuses []*ComponentStatuses `json:"componentStatuses"`
 	} `json:"data"`
+}
+
+type HostInfo struct {
+	CPUInfo struct {
+		Count int `json:"count"`
+	} `json:"cpuInfo"`
+	MemoryInfo struct {
+		MemTotal int `json:"memTotal"`
+		MemFree  int `json:"memFree"`
+	} `json:"memoryInfo"`
+	DiskInfo struct {
+		MountPoints map[string]MountPoint `json:"mountPoints"`
+	} `json:"diskInfo"`
+}
+
+type MountPoint struct {
+	Total int `json:"total"`
+	Used  int `json:"used"`
 }
 
 type LaunchConfig struct {
@@ -49,7 +71,6 @@ type Condition struct {
 	Status string `json:"status"`
 }
 
-
 // processMetrics - Collects the data from the API, returns data object
 func (e *Exporter) processMetrics(data *Data, endpoint string, hideSys bool, ch chan<- prometheus.Metric) error {
 	var filteredLabels map[string]string
@@ -57,7 +78,7 @@ func (e *Exporter) processMetrics(data *Data, endpoint string, hideSys bool, ch 
 	// Metrics - range through the data object
 	for _, x := range data.Data {
 		// If system services have been ignored, the loop simply skips them
-		if hideSys == true && x.System == true {
+		if hideSys && x.System {
 			continue
 		}
 
@@ -66,11 +87,16 @@ func (e *Exporter) processMetrics(data *Data, endpoint string, hideSys bool, ch 
 		if dataType == "" {
 			dataType = x.Type
 		}
-		if checkMetric(endpoint, dataType) == false {
+		if !checkMetric(endpoint, dataType) {
 			continue
 		}
 
 		log.Debugf("Processing metrics for %s", endpoint)
+
+		environmentName := ""
+		if endpoint != "accounts" {
+			environmentName = retrieveEnvRef(x.AccountID)
+		}
 
 		if endpoint == "hosts" {
 			filteredLabels = e.allowedLabels(x.Labels)
@@ -78,21 +104,29 @@ func (e *Exporter) processMetrics(data *Data, endpoint string, hideSys bool, ch 
 			if x.Name != "" {
 				s = x.Name
 			}
-			if err := e.setHostMetrics(s, x.State, x.AgentState, filteredLabels); err != nil {
-				log.Errorf("Error processing host metrics: %s", err)
-				log.Errorf("Attempt Failed to set %s, %s, [agent] %s ", x.HostName, x.State, x.AgentState)
-				continue
+			e.setHostStateMetrics(s, x.State, x.AgentState, filteredLabels)
+			if x.HostInfo != nil {
+				e.setHostInfoMetrics(s, x.HostInfo, filteredLabels, x.AccountID, environmentName)
 			}
+		} else if endpoint == "accounts" {
+
+			// only collect project(environment)
+			if x.Type == "project" {
+				envRef = storeEnvRef(x.ID, x.Name)
+
+				if err := e.setEnvMetrics(x.ID, x.Name, x.State); err != nil {
+					log.Errorf("Error processing env metrics: %s", err)
+					log.Errorf("Attempt Failed to set %s, %s, %s", x.ID, x.Name, x.State)
+					continue
+				}
+			}
+
 		} else if endpoint == "stacks" {
 			// Used to create a map of stackID and stackName
 			// Later used as a dimension in service metrics
 			stackRef = storeStackRef(x.ID, x.Name)
 
-			if err := e.setStackMetrics(x.Name, x.State, x.HealthState, strconv.FormatBool(x.System)); err != nil {
-				log.Errorf("Error processing stack metrics: %s", err)
-				log.Errorf("Attempt Failed to set %s, %s, %s, %t", x.Name, x.State, x.HealthState, x.System)
-				continue
-			}
+			e.setStackMetrics(x.Name, x.State, x.HealthState, strconv.FormatBool(x.System))
 		} else if endpoint == "services" {
 			// Retrieves the stack Name from the previous values stored.
 			var stackName = retrieveStackRef(x.StackID)
@@ -105,36 +139,22 @@ func (e *Exporter) processMetrics(data *Data, endpoint string, hideSys bool, ch 
 				filteredLabels = e.allowedLabels(x.LaunchConfig.Labels)
 			}
 
-			if err := e.setServiceMetrics(x.Name, stackName, x.State, x.HealthState, x.Scale, filteredLabels); err != nil {
-				log.Errorf("Error processing service metrics: %s", err)
-				log.Errorf("Attempt Failed to set %s, %s, %s, %s, %d", x.Name, stackName, x.State, x.HealthState, x.Scale)
-				continue
-			}
-
 			e.setServiceMetrics(x.Name, stackName, x.State, x.HealthState, x.Scale, filteredLabels)
 		} else if endpoint == "clusters" {
 			clusterRef = storeClusterRef(x.ID, x.Name)
-			if err := e.setClusterMetrics(x.Name, x.State, x.ComponentStatuses); err != nil {
-				log.Errorf("Error processing cluster metrics: %s", err)
-				log.Errorf("Attempt Failed to set %s, %s", x.Name, x.State)
-				continue
-			}
+			e.setClusterMetrics(x.Name, x.State, x.ComponentStatuses)
 		} else if endpoint == "nodes" {
 			// Retrieves the cluster Name from the previous values stored.
-			var clusterName = retrieveClusterRef(x.ClusterId)
+			var clusterName = retrieveClusterRef(x.ClusterID)
 
 			if clusterName == "unknown" {
 				log.Warnf("Failed to obtain cluster_name for %s from the API", x.NodeName)
 			}
 
-			if err := e.setNodeMetrics(x.NodeName, x.State, clusterName); err != nil {
-				log.Errorf("Error processing node metrics: %s", err)
-				log.Errorf("Attempt Failed to set %s, %s", x.NodeName, x.State)
-				continue
-			}
+			e.setNodeMetrics(x.NodeName, x.State, clusterName)
 		}
-	}
 
+	}
 	return nil
 }
 
@@ -252,6 +272,28 @@ func retrieveClusterRef(clusterID string) string {
 			return "unknown"
 		} else if clusterID == key {
 			log.Debugf("ClusterRef - Key is %s, Value is %s ClusterID is %s", key, value, clusterID)
+			return value
+		}
+	}
+	// returns unknown if no match was found
+	return "unknown"
+}
+
+func storeEnvRef(ID string, name string) map[string]string {
+
+	envRef[ID] = name
+
+	return envRef
+}
+
+// retrieveStackRef returns the stack name, when sending the stackID
+func retrieveEnvRef(envID string) string {
+
+	for key, value := range envRef {
+		if envID == "" {
+			return "unknown"
+		} else if envID == key {
+			log.Debugf("envRef - Key is %s, Value is %s envID is %s", key, value, envID)
 			return value
 		}
 	}

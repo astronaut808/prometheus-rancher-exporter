@@ -1,17 +1,14 @@
 # prometheus-rancher-exporter
 
-Exposes the health of Stacks / Services and Hosts from the Rancher API, to a Prometheus compatible endpoint.
+Exposes the health of Stacks / Services, Hosts, information about resources used by hosts from the Rancher API, to a Prometheus compatible endpoint.
+
+Forked from `infinityworks/prometheus-rancher-exporter` with metrics about resources used by hosts (cpu count, memory information, mountpoint information) and labels (environment id, environment name).
 
 
 ## Description
 
-The application can be run in a number of ways, the main consumption is the Docker hub image `infinityworks/prometheus-rancher-exporter`.
-
 The application requires at a minimum, the URL of the Rancher API. If you have authentication enabled on your Rancher server, the application will require a `RANCHER_ACCESS_KEY` and a `RANCHER_SECRET_KEY` providing.
 
-If you are running the application in a Rancher managed container, you can make use of Rancher labels  to obtain an API key and auto-provision all of this information, details of this can be seen in the Docker Compose section.
-
-If you are using this externally to Rancher, or without the use of the labels to obtain an API key, you can update these values yourself, using environment variables.
 
 **Required**
 * `CATTLE_URL` // Either provisioned through labels, or set by the user. Should be in a format similar to `http://<YOUR_IP>:8080/v2-beta`.
@@ -26,64 +23,19 @@ If you are using this externally to Rancher, or without the use of the labels to
 * `LOG_LEVEL`           // Optional - Set the logging level, defaults to Info.
 * `API_LIMIT`           // Optional - Rancher API resource limit (default: 100)
 
-## Compatibility
-
-Along with the release of Rancher 1.2, a new API was introduced, the oppertunity was taken to re-write the exporter into Golang, so it's more comparible to the platforms it's interacting with. 
-Testing has focused on the `v1` and `v2-beta` available with Rancher 1.2.  The `v1` support should in theory work on older versions of Rancher Server but testing has been limited.
-
-If you find any issues, bug reports or PR's are more than welcome.
-
-## Install and deploy
-
-Run manually from Docker Hub:
-```
-docker run -d -e CATTLE_ACCESS_KEY="XXXXXXXX" -e CATTLE_SECRET_KEY="XXXXXXX" -e CATTLE_URL="http://<YOUR_IP>:8080/v2-beta" -p 9173:9173 infinityworks/prometheus-rancher-exporter
-```
-
-Build a docker image:
-```
-docker build -t <image-name> .
-docker run -d -e CATTLE_ACCESS_KEY="XXXXXXXX" -e CATTLE_SECRET_KEY="XXXXXXX" -e CATTLE_URL="http://<YOUR_IP>:8080/v2-beta" -p 9173:9173 <image-name>
-```
-
-## Docker compose
-
-For users running the container within a Rancher managed environment:
-```
-prometheus-rancher-exporter:
-    tty: true
-    stdin_open: true
-    labels:
-      io.rancher.container.create_agent: true
-      io.rancher.container.agent.role: environment
-    expose:
-      - 9173:9173
-    image: infinityworks/prometheus-rancher-exporter:latest
-```
-
-For users running the container outside a Rancher managed environment:
-```
-prometheus-rancher-exporter:
-    tty: true
-    stdin_open: true
-    environment:
-      - CATTLE_ACCESS_KEY="xxxx"
-      - CATTLE_SECRET_KEY="xxxxxx"
-      - CATTLE_URL="http://<YOUR_IP>:8080/v2-beta"
-      - HIDE_SYS=true
-    expose:
-      - 9173:9173
-    image: infinityworks/prometheus-rancher-exporter:latest
-```
-
-
 ## Metrics
 
-Metrics will be made available on port 9173 by default, or you can pass environment variable ```LISTEN_ADDRESS``` to override this.
-An example printout of the metrics you should expect to see can be found in `METRICS.md`.
-
-
-## Metadata
-[![](https://images.microbadger.com/badges/version/infinityworks/prometheus-rancher-exporter.svg)](http://microbadger.com/images/infinityworks/prometheus-rancher-exporter "Get your own version badge on microbadger.com") [![](https://images.microbadger.com/badges/image/infinityworks/prometheus-rancher-exporter.svg)](http://microbadger.com/images/infinityworks/prometheus-rancher-exporter "Get your own image badge on microbadger.com")
-[![Go Report Card](https://goreportcard.com/badge/github.com/infinityworks/prometheus-rancher-exporter)](https://goreportcard.com/report/github.com/infinityworks/prometheus-rancher-exporter)
-[![GoDoc](https://godoc.org/github.com/infinityworks/prometheus-rancher-exporter?status.svg)](https://godoc.org/github.com/infinityworks/prometheus-rancher-exporter)
+```
+rancher_environment_state{id="test-id",name="test-cattle",state="active"} 1
+rancher_host_agent_state{labels="",name="test-agent",state="active"} 1
+rancher_host_state{labels="",name="test-agent",state="active"} 1
+rancher_host_cpu_count{environment_id="test-id",environment_name="test-cattle",labels="",name="test-app-1"} 4
+rancher_host_mem_free{environment_id="test-id",environment_name="test-cattle",labels="",name="test-app-1"} 1604
+rancher_host_mem_total{environment_id="test-id",environment_name="test-cattle",labels="",name="test-app-1"} 7983
+rancher_host_mountpoint_used{environment_id="test-id",environment_name="test-cattle",labels="",mountpoint="/dev/sda1",name="test-app-1"} 8640
+rancher_host_mountpoint_total{environment_id="test-id",environment_name="test-cattle",labels="",mountpoint="/dev/sda1",name="test-app-1"} 18538
+rancher_service_health_status{health_state="healthy",labels="",name="test-service-1",stack_name="test-stack-1"} 0
+rancher_service_scale{labels="",name="test-service-1",stack_name="test-stack-1"} 1
+rancher_service_state{labels="",name="test-service-1",stack_name="test-stack-1",state="active"} 1
+rancher_stack_state{name="test-stack-1",state="active",system="false"} 1
+```
