@@ -26,16 +26,16 @@ The application requires at a minimum, the URL of the Rancher API. If you have a
 ## Metrics
 
 ```
-rancher_host_state
-rancher_host_cpu_count
-rancher_host_mem_free
-rancher_host_mem_total
-rancher_host_mountpoint_used
-rancher_host_mountpoint_total
-rancher_service_health_status
-rancher_service_scale
-rancher_service_state
-rancher_stack_state
-rancher_node_state
-rancher_cluster_state
+rancher_environment_state{id="test-id",name="test-cattle",state="active"} 1
+rancher_host_agent_state{labels="",name="test-agent",state="active"} 1
+rancher_host_state{labels="",name="test-agent",state="active"} 1
+rancher_host_cpu_count{environment_id="test-id",environment_name="test-cattle",labels="",name="test-app-1"} 4
+rancher_host_mem_free{environment_id="test-id",environment_name="test-cattle",labels="",name="test-app-1"} 1604
+rancher_host_mem_total{environment_id="test-id",environment_name="test-cattle",labels="",name="test-app-1"} 7983
+rancher_host_mountpoint_used{environment_id="test-id",environment_name="test-cattle",labels="",mountpoint="/dev/sda1",name="test-app-1"} 8640
+rancher_host_mountpoint_total{environment_id="test-id",environment_name="test-cattle",labels="",mountpoint="/dev/sda1",name="test-app-1"} 18538
+rancher_service_health_status{health_state="healthy",labels="",name="test-service-1",stack_name="test-stack-1"} 0
+rancher_service_scale{labels="",name="test-service-1",stack_name="test-stack-1"} 1
+rancher_service_state{labels="",name="test-service-1",stack_name="test-stack-1",state="active"} 1
+rancher_stack_state{name="test-stack-1",state="active",system="false"} 1
 ```
