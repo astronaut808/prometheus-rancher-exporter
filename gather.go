@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -198,23 +199,24 @@ func getJSON(url string, accessKey string, secretKey string, target interface{})
 
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
-
 	if err != nil {
 		log.Error("Error Collecting JSON from API: ", err)
+		return err
 	}
 
 	req.SetBasicAuth(accessKey, secretKey)
 	resp, err := client.Do(req)
-
 	if err != nil {
 		log.Error("Error Collecting JSON from API: ", err)
+		return err
 	}
 
 	if resp.StatusCode != 200 {
 		log.Error("Error Collecting JSON from API: ", resp.Status)
+		return fmt.Errorf("unexpected status code: %v", resp.Status)
 	}
 
-	respFormatted := json.NewDecoder(resp.Body).Decode(target)
+	err = json.NewDecoder(resp.Body).Decode(target)
 
 	// Timings recorded as part of internal metrics
 	elapsed := float64((time.Since(start)) / time.Microsecond)
@@ -223,8 +225,7 @@ func getJSON(url string, accessKey string, secretKey string, target interface{})
 	// Close the response body, the underlying Transport should then close the connection.
 	resp.Body.Close()
 
-	// return formatted JSON
-	return respFormatted
+	return nil
 }
 
 // setEndpoint - Determines the correct URL endpoint to use, gives us backwards compatibility
