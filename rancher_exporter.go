@@ -1,11 +1,11 @@
 package main
 
 import (
-	"flag"
 	"net/http"
 	"os"
 	"regexp"
 	"strconv"
+	"time"
 
 	"github.com/infinityworks/prometheus-rancher-exporter/measure"
 	"github.com/prometheus/client_golang/prometheus"
@@ -22,6 +22,7 @@ const (
 var (
 	log = logrus.New()
 
+	cacheTTLRaw   = getEnv("CACHE_TTL", "0s")
 	metricsPath   = getEnv("METRICS_PATH", "/metrics")            // Path under which to expose metrics
 	listenAddress = getEnv("LISTEN_ADDRESS", ":9173")             // Address on which to expose metrics
 	rancherURL    = os.Getenv("CATTLE_URL")                       // URL of Rancher Server API e.g. http://192.168.0.1:8080/v2-beta
@@ -61,8 +62,6 @@ func getEnv(key, fallback string) string {
 }
 
 func main() {
-	flag.Parse()
-
 	// Sets the logging value for the exporter, defaults to info
 	setLogLevel(logLevel)
 
@@ -75,13 +74,18 @@ func main() {
 		labelsFilter = defaultLabelsFilter
 	}
 
+	cacheTTL, err := time.ParseDuration(cacheTTLRaw)
+	if err != nil {
+		log.Fatal("CACHE_TTL must be valid time.Duration")
+	}
+
 	labelsFilterRegexp, err := regexp.Compile(labelsFilter)
 	if err != nil {
 		log.Fatal("LABELS_FILTER must be valid regular expression")
 	}
 
 	log.Info("Starting Prometheus Exporter for Rancher")
-	log.Info(
+	log.Debug(
 		"Runtime Configuration in-use: URL of Rancher Server: ",
 		rancherURL,
 		" Access key: ",
@@ -96,7 +100,7 @@ func main() {
 	measure.Init()
 
 	// Register a new Exporter
-	exporter := newExporter(rancherURL, accessKey, secretKey, labelsFilterRegexp, hideSys, resourceLimit)
+	exporter := newExporter(rancherURL, accessKey, secretKey, labelsFilterRegexp, hideSys, resourceLimit, cacheTTL)
 
 	// Register Metrics from each of the endpoints
 	// This invokes the Collect method through the prometheus client libraries.

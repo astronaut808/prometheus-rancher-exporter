@@ -22,6 +22,7 @@ The application requires at a minimum, the URL of the Rancher API. If you have a
 * `LABELS_FILTER`       // Optional regular expression for filtering service and host labels, defaults to `^io.prometheus`.
 * `LOG_LEVEL`           // Optional - Set the logging level, defaults to Info.
 * `API_LIMIT`           // Optional - Rancher API resource limit (default: 100)
+* `CACHE_TTL`           // Optional - Exporter Metrics Cache time to live (s,m,h) (default: 0s)
 
 ## Metrics
 
