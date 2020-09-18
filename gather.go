@@ -154,7 +154,6 @@ func (e *Exporter) processMetrics(data *Data, endpoint string, hideSys bool, ch 
 
 			e.setNodeMetrics(x.NodeName, x.State, clusterName)
 		}
-
 	}
 	return nil
 }
@@ -174,7 +173,6 @@ func (e *Exporter) gatherData(rancherURL string, resourceLimit string, accessKey
 		return nil, err
 	}
 	log.Debugf("JSON Fetched for: "+endpoint+": %+v", data)
-
 	return data, err
 }
 
@@ -231,17 +229,14 @@ func getJSON(url string, accessKey string, secretKey string, target interface{})
 // setEndpoint - Determines the correct URL endpoint to use, gives us backwards compatibility
 func setEndpoint(rancherURL string, component string, resourceLimit string) string {
 	var endpoint string
-
 	endpoint = (rancherURL + "/" + component + "/" + "?limit=" + resourceLimit)
 	endpoint = strings.Replace(endpoint, "v1", "v2-beta", 1)
-
 	return endpoint
 }
 
 // storeStackRef stores the stackID and stack name for use as a label elsewhere
 func storeStackRef(stackID string, stackName string) map[string]string {
 	stackRef[stackID] = stackName
-
 	return stackRef
 }
 
@@ -262,7 +257,6 @@ func retrieveStackRef(stackID string) string {
 // storeClusterRef stores the clusterID and cluster name for use as a label elsewhere
 func storeClusterRef(clusterID string, clusterName string) map[string]string {
 	clusterRef[clusterID] = clusterName
-
 	return clusterRef
 }
 
@@ -281,9 +275,7 @@ func retrieveClusterRef(clusterID string) string {
 }
 
 func storeEnvRef(ID string, name string) map[string]string {
-
 	envRef[ID] = name
-
 	return envRef
 }
 
